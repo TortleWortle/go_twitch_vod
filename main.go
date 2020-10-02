@@ -17,7 +17,7 @@ import (
 const ClientID = "jzkbprff40iqj646a697cyrvl0zt2m6"
 
 func main() {
-	if len(os.Args[1]) < 2 {
+	if len(os.Args) < 2 {
 		log.Fatal("Please specify video id")
 	}
 	videoID := os.Args[1]
@@ -133,7 +133,7 @@ func downloadVod(tmpdir, videoID string) error {
 }
 
 func mergeParts(dir string, parts []string) error {
-	merged, err := os.OpenFile(path.Join(dir, "merged.ts"), os.O_WRONLY | os.O_APPEND | os.O_CREATE, 0666)
+	merged, err := os.OpenFile(path.Join(dir, "merged.ts"), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func downloadParts(dir, baseUrl string, parts []string) error {
 			return errors.New(fmt.Sprintf("could not download part(%s): %v", part, err))
 		}
 		defer res.Body.Close()
-		f, err := os.OpenFile(path.Join(dir, part), os.O_CREATE | os.O_RDWR, 0666)
+		f, err := os.OpenFile(path.Join(dir, part), os.O_CREATE|os.O_RDWR, 0666)
 		if err != nil {
 			return err
 		}
