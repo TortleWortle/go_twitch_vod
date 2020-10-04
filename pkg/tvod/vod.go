@@ -3,7 +3,6 @@ package tvod
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -85,7 +84,7 @@ func (v *Vod) loadSources(ctx context.Context) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return errors.New(fmt.Sprintf("could not get sources (statuscode: %d)", res.StatusCode))
+		return fmt.Errorf("could not get sources (statuscode: %d)", res.StatusCode)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {

@@ -31,7 +31,7 @@ var downloadCmd = &cobra.Command{
 	PostRunE: func(cmd *cobra.Command, args []string) error {
 		tmpdir := cmd.Flag("tmpdir").Value.String()
 		if err := os.RemoveAll(tmpdir); err != nil {
-			return fmt.Errorf("could not cleanup tmp directory: %v", err)
+			return fmt.Errorf("could not cleanup tmp directory: %w", err)
 		}
 		return nil
 	},
@@ -61,7 +61,7 @@ var downloadCmd = &cobra.Command{
 			}
 		}
 		if sourceToDownload.Name == "" {
-			return errors.New(fmt.Sprintf("source: %s does not exist", selectedSource))
+			return fmt.Errorf("source: %s does not exist", selectedSource)
 		}
 		fmt.Printf("Downloading %s:%s\n", args[0], sourceToDownload.Name)
 
@@ -107,7 +107,7 @@ func mergeParts(filename string, tmpdir string, parts []tvod.VodPart) error {
 		defer f.Close()
 		_, err = io.Copy(merged, f)
 		if err != nil {
-			return errors.New(fmt.Sprintf("could not copy: %v", err))
+			return fmt.Errorf("could not copy: %w", err)
 		}
 		f.Close()
 	}
