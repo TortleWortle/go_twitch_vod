@@ -38,7 +38,7 @@ func (p VodPart) Stream(ctx context.Context) (io.ReadCloser, error) {
 	if res.StatusCode == 200 {
 		return res.Body, nil
 	}
-	return nil, errors.New(fmt.Sprintf("server did not respond with 200 (%d): %v", res.StatusCode, res))
+	return nil, fmt.Errorf("server did not respond with 200 (%d): %v", res.StatusCode, res)
 }
 
 type VodSource struct {
