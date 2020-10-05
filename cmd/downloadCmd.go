@@ -61,7 +61,15 @@ var downloadCmd = &cobra.Command{
 			}
 		}
 		if sourceToDownload.Name == "" {
-			return fmt.Errorf("source: %s does not exist", selectedSource)
+			out := ""
+			for _, source := range vod.Sources {
+				name := source.Name
+				if source.Name == "chunked" {
+					name = "source"
+				}
+				out += fmt.Sprintf("\n- %s", name)
+			}
+			return fmt.Errorf("source: %s does not exist\nAvailable sources:%s", selectedSource, out)
 		}
 		fmt.Printf("Downloading %s:%s\n", args[0], sourceToDownload.Name)
 
