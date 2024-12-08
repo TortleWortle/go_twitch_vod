@@ -3,13 +3,15 @@ package tvod
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"log/slog"
 	"net/http"
 	"strings"
 )
 
-const clientID = "jzkbprff40iqj646a697cyrvl0zt2m6"
+const clientID = "kimne78kx3ncx6brgo4mv6wki5h1ko"
 
 type Vod struct {
 	Sources []VodSource
@@ -31,49 +33,76 @@ func NewVod(videoID string) *Vod {
 	return vod
 }
 
+type loadTokenResponse struct {
+	Data struct {
+		VideoPlaybackAccessToken struct {
+			Value     string `json:"value"`
+			Signature string `json:"signature"`
+			Typename  string `json:"__typename"`
+		} `json:"videoPlaybackAccessToken"`
+	} `json:"data"`
+	Extensions struct {
+		DurationMilliseconds int    `json:"durationMilliseconds"`
+		OperationName        string `json:"operationName"`
+		RequestID            string `json:"requestID"`
+	} `json:"extensions"`
+}
+
+func getLoadTokenBody(id string) string {
+	return fmt.Sprintf(`{"operationName":"PlaybackAccessToken_Template","query":"query PlaybackAccessToken_Template($login: String!, $isLive: Boolean!, $vodID: ID!, $isVod: Boolean!, $playerType: String!, $platform: String!) {  streamPlaybackAccessToken(channelName: $login, params: {platform: $platform, playerBackend: \"mediaplayer\", playerType: $playerType}) @include(if: $isLive) {    value    signature   authorization { isForbidden forbiddenReasonCode }   __typename  }  videoPlaybackAccessToken(id: $vodID, params: {platform: $platform, playerBackend: \"mediaplayer\", playerType: $playerType}) @include(if: $isVod) {    value    signature   __typename  }}","variables":{"isLive":false,"login":"","isVod":true,"vodID":"%s","playerType":"site","platform":"web"}}`, id)
+}
+
 func (v *Vod) loadToken(ctx context.Context) error {
-	url := fmt.Sprintf("https://api.twitch.tv/api/vods/%s/access_token?as3=t", v.videoID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	url := "https://gql.twitch.tv/gql"
+	body := strings.NewReader(getLoadTokenBody(v.videoID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
 	if err != nil {
-		return err
+		return errors.Join(errors.New("creating request"), err)
 	}
 	req.Header.Set("Client-ID", clientID)
-	req.Header.Set("Accept", "application/vnd.twitchtv.v5+json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return errors.Join(errors.New("performing"), err)
 	}
 	defer res.Body.Close()
-	body, err := ioutil.ReadAll(res.Body)
+	slog.Info("token response", slog.Int("status", res.StatusCode))
+	bodyRes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return err
+		return errors.Join(errors.New("reading body"), err)
 	}
-	var tok token
-	err = json.Unmarshal(body, &tok)
+	var tok loadTokenResponse
+	err = json.Unmarshal(bodyRes, &tok)
 	if err != nil {
-		return err
+		return errors.Join(errors.New("unmarshalling json"), err)
 	}
-	v.token = tok
+
+	newToken := token{
+		Token:     tok.Data.VideoPlaybackAccessToken.Value,
+		Signature: tok.Data.VideoPlaybackAccessToken.Signature,
+	}
+	v.token = newToken
 	return nil
 }
 
 // Load the info from twitch servers
 func (v *Vod) Load(ctx context.Context) error {
 	// grab token
+	slog.Info("loading token")
 	err := v.loadToken(ctx)
 	if err != nil {
-		return err
+		return errors.Join(errors.New("loading token"), err)
 	}
 	// grab sources
+	slog.Info("loading sources")
 	err = v.loadSources(ctx)
 	if err != nil {
-		return err
+		return errors.Join(errors.New("loading sources"), err)
 	}
 	return nil
 }
 
 func (v *Vod) loadSources(ctx context.Context) error {
-	url := fmt.Sprintf("http://usher.twitch.tv/vod/%s?nauth=%s&nauthsig=%s&allow_source=true&player=twitchweb&allow_spectre=true", v.videoID, v.token.Token, v.token.Signature)
+	url := fmt.Sprintf("http://usher.ttvnw.net/vod/%s.m3u8?nauth=%s&nauthsig=%s&allow_source=true&player=twitchweb&allow_spectre=true", v.videoID, v.token.Token, v.token.Signature)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
@@ -88,11 +117,11 @@ func (v *Vod) loadSources(ctx context.Context) error {
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return err
+		return errors.Join(errors.New("reading body"), err)
 	}
 	sources, err := parseSources(string(body))
 	if err != nil {
-		return err
+		return errors.Join(errors.New("parsing sources"), err)
 	}
 	v.Sources = sources
 	return nil
